@@ -1,0 +1,7 @@
+streamlit
+CoolProp
+xgboost
+scikit-learn
+joblib
+pandas
+numpy
