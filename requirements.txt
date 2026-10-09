@@ -1,8 +1,8 @@
-   streamlit
-   CoolProp==8.0.0
-   xgboost==3.4.1
-   scikit-learn==1.6.1
-   joblib==1.6.0
-   pandas
-   numpy
-   plotly
+streamlit
+CoolProp==8.0.0
+xgboost==3.4.1
+scikit-learn==1.6.1
+joblib==1.6.0
+pandas
+numpy
+plotly
