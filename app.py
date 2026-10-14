@@ -4,6 +4,7 @@ import numpy as np
 import streamlit as st
 
 import plots
+import viz3d
 from fluidcalc import FLUIDS
 from hybrid import HybridModel
 
@@ -44,6 +45,12 @@ def run_sweep(_model, base_items, var, lo, hi):
 @st.cache_data(show_spinner="3D səth hesablanır (bir neçə saniyə)...")
 def run_surface(_model, base_items, xvar, yvar, xlim, ylim):
     return plots.surface_data(_model, dict(base_items), xvar, yvar, xlim, ylim, n=15)
+
+
+@st.cache_data(show_spinner="3D axın sahəsi hesablanır...")
+def run_flow3d(label, params_items, fluid_name, T_prop, P):
+    pr = viz3d.props(fluid_name, T_prop, P)
+    return viz3d.build(label, dict(params_items), pr)
 
 
 model = load_model()
@@ -94,8 +101,8 @@ base_items = tuple(sorted(base.items()))
 bounds = (FLUIDS[base["fluid"]][2], FLUIDS[base["fluid"]][3])
 avail = plots.available_vars(base["geometry"])
 
-tab_res, tab_sweep, tab_surf, tab_pipe = st.tabs(
-    ["Nəticə", "Həssaslıq qrafiki", "3D səth", "Boru 3D (illüstrasiya)"]
+tab_res, tab_sweep, tab_surf, tab_pipe, tab_flow = st.tabs(
+    ["Nəticə", "Həssaslıq qrafiki", "3D səth", "Boru 3D (illüstrasiya)", "3D axın sahəsi (analitik)"]
 )
 
 with tab_res:
@@ -179,3 +186,37 @@ with tab_pipe:
             "çıxışdakı sürət profilinin formasıdır. Radius miqyası şişirdilib, real boru "
             "bu şəkildən xeyli nazikdir."
         )
+
+with tab_flow:
+    g = base["geometry"]
+    label = LABELS[g]
+    if label not in viz3d.SUPPORTED:
+        st.info("Bu həndəsə üçün 3D hələlik yoxdur.")
+    elif base["velocity"] is None and g != "vplate_natural":
+        st.warning("Bu həndəsə üçün sürət lazımdır.")
+    else:
+        Lc, v = base["L"], base["velocity"]
+        Tr, Tw = base["T_ref"], base["T_wall"]
+        T_prop = Tr  # boru: xassələr T_ref-də
+        if g == "pipe_CWT":
+            params = dict(D=Lc, L=Lc * base["L_over_D"], U=v, T_in=Tr, T_w=Tw)
+        elif g == "pipe_CHF":
+            params = dict(D=Lc, L=Lc * base["L_over_D"], U=v, T_in=Tr,
+                          q=out["h"] * (Tw - Tr))  # q'' = h·ΔT
+        elif g == "plate_forced":
+            params = dict(L=Lc, U=v, T_inf=Tr, T_w=Tw)
+            T_prop = (Tr + Tw) / 2  # film temperaturu
+        else:  # vplate_natural
+            params = dict(H=Lc, T_inf=Tr, T_w=Tw)
+            T_prop = (Tr + Tw) / 2
+        try:
+            fig, info = run_flow3d(label, tuple(sorted(params.items())),
+                                   FLUIDS[base["fluid"]][0], T_prop, base["P"])
+        except Exception as e:
+            st.error(f"3D hesablama alınmadı: {e}")
+        else:
+            st.plotly_chart(fig, use_container_width=True)
+            if info["regime"] != "laminar":
+                st.warning("Bu 3D model yalnız laminar həllə əsaslanır: " + info["regime"])
+            st.caption("Analitik həll (Graetz, Blasius/Pohlhausen, Ostrach). CFD deyil. "
+                       "Rəng temperaturu, oxlar sürət profilini göstərir.")
