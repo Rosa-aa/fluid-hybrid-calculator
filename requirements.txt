@@ -6,3 +6,4 @@ joblib==1.6.0
 pandas
 numpy
 plotly
+scipy
